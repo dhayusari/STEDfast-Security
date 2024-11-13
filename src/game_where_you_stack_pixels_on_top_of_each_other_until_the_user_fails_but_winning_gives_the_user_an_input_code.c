@@ -1,109 +1,92 @@
 #include "stm32f0xx_hal.h"
-#include "tft_display_driver.h"  // Include your specific TFT driver header
 
-#define SCREEN_WIDTH  240
-#define SCREEN_HEIGHT 320
-#define PIXEL_SIZE    10
-#define STACK_START_X 100
-#define STACK_START_Y (SCREEN_HEIGHT - PIXEL_SIZE)
-#define STACK_MAX_HEIGHT (SCREEN_HEIGHT / PIXEL_SIZE)
-
-volatile uint8_t game_running = 0;
-volatile uint8_t button_pressed = 0;
-
-typedef struct {
-    int16_t x;
-    int16_t y;
-    int8_t direction; // 1 for right, -1 for left
-} Pixel;
-
-Pixel moving_pixel;
-int16_t stack_top_y = STACK_START_Y;
-int16_t stack_x = STACK_START_X;
-
-void SystemClock_Config(void);
-void Error_Handler(void);
-void EXTI0_1_IRQHandler(void);
-void init_game(void);
-void update_game(void);
-void draw_pixel(Pixel *pixel, uint16_t color);
-
-int main(void) {
-    HAL_Init();
-    SystemClock_Config();
+void init_spi1_slow(void) {
+    // Enable clock for GPIOB and SPI1
+    RCC->AHBENR |= RCC_AHBENR_GPIOBEN;
     
-    // Initialize peripherals (buttons, TFT, etc.)
-    tft_init();  // Initialize TFT display
-    init_game();
+    // Configure GPIOB pins for SPI1
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-    while (1) {
-        if (game_running) {
-            update_game();
-        }
-    }
-}
+    // Configure PB3 (SCK), PB4 (MISO), PB5 (MOSI)
+    GPIO_InitStruct.Pin = GPIO_PIN_3 | GPIO_PIN_4 | GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF0_SPI1;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-void init_game(void) {
-    game_running = 0;
-    moving_pixel.x = STACK_START_X;
-    moving_pixel.y = stack_top_y;
-    moving_pixel.direction = 1;
-    
-    // Clear the display
-    tft_fill_screen(BLACK);
-    
-    // Draw the initial pixel
-    draw_pixel(&moving_pixel, WHITE);
-}
+    // Configure SPI1
+    SPI_HandleTypeDef hspi1 = {0};
+    hspi1.Instance = SPI1;
+    hspi1.Init.Mode = SPI_MODE_MASTER;
+    hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+    hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+    hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+    hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+    hspi1.Init.NSS = SPI_NSS_SOFT;
+    hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256; // Maximum divisor (slow speed)
+    hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+    hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+    hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+    hspi1.Init.CRCPolynomial = 10;
 
-void update_game(void) {
-    if (button_pressed) {
-        button_pressed = 0;
-
-        // Check if the stack is aligned
-        if (moving_pixel.x != stack_x) {
-            // Game over
-            tft_fill_screen(RED);  // Display game over indication
-            HAL_Delay(2000);       // Delay for game over display
-            init_game();           // Restart game
-            return;
-        }
-
-        // Move the stack up
-        stack_top_y -= PIXEL_SIZE;
-        if (stack_top_y < 0) {
-            stack_top_y = 0;
-            game_running = 0;  // Game won condition (if needed)
-        }
-        stack_x = moving_pixel.x; // Update the stack position
-        moving_pixel.y = stack_top_y;
+    if (HAL_SPI_Init(&hspi1) != HAL_OK) {
+        // Initialization error
+        Error_Handler();
     }
 
-    // Move the pixel
-    tft_fill_rect(moving_pixel.x, moving_pixel.y, PIXEL_SIZE, PIXEL_SIZE, BLACK);  // Erase old pixel
-    moving_pixel.x += moving_pixel.direction * PIXEL_SIZE / 2;  // Adjust speed as needed
-
-    // Boundary check
-    if (moving_pixel.x <= 0 || moving_pixel.x >= (SCREEN_WIDTH - PIXEL_SIZE)) {
-        moving_pixel.direction *= -1;  // Reverse direction
-    }
-
-    // Draw new pixel
-    draw_pixel(&moving_pixel, WHITE);
+    // Set FIFO reception threshold
+    __HAL_SPI_ENABLE(&hspi1);
 }
 
-void draw_pixel(Pixel *pixel, uint16_t color) {
-    tft_fill_rect(pixel->x, pixel->y, PIXEL_SIZE, PIXEL_SIZE, color);
+void enable_sdcard(void) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET); // Set PB2 low to enable SD card
 }
 
-// Interrupt handler for button press (start/stop)
-void EXTI0_1_IRQHandler(void) {
-    if (__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_0) != RESET) {  // Check which button was pressed
-        __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_0);
-        if (!game_running) {
-            game_running = 1;  // Start the game
-        } else {
-            button_pressed = 1;  // Stop the pixel stack
-        }
-    }
+void disable_sdcard(void) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET); // Set PB2 high to disable SD card
+}
+
+void init_sdcard_io(void) {
+    // Initialize SPI1 in slow mode
+    init_spi1_slow();
+
+    // Configure PB2 as output for SD card enable/disable
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    // Disable SD card initially
+    disable_sdcard();
+}
+
+void sdcard_io_high_speed(void) {
+    // Disable SPI1
+    SPI1->CR1 &= ~SPI_CR1_SPE;
+
+    // Set SPI1 baud rate to 12 MHz (adjust as needed)
+    SPI1->CR1 &= ~SPI_CR1_BR; // Clear baud rate bits
+    SPI1->CR1 |= SPI_BAUDRATEPRESCALER_8; // Assuming 12 MHz SPI clock
+
+    // Re-enable SPI1
+    SPI1->CR1 |= SPI_CR1_SPE;
+}
+
+void init_lcd_spi(void) {
+    // Configure PB8, PB11, PB14 as GPIO outputs
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_11 | GPIO_PIN_14;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    // Initialize SPI1 in slow mode
+    init_spi1_slow();
+
+    // Switch to high speed for LCD
+    sdcard_io_high_speed();
 }
