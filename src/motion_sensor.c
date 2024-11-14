@@ -34,28 +34,28 @@ void disable_sensor(){
 
 void read_motion() {
 
-    if (hist > 0x01){
+    if (hist == 0x01){
         GPIOA -> BSRR |= GPIO_BSRR_BS_3;
     }
-    // if (hist == 0xfe)
+    if (hist == 0xfe)
+         GPIOA -> BSRR |= GPIO_BSRR_BR_3;
+    // else {
     //     GPIOA -> BSRR |= GPIO_BSRR_BR_3;
-    else {
-        GPIOA -> BSRR |= GPIO_BSRR_BR_3;
-    }
+    // }
 }
 
 void update_history(){
     int temp = GPIOA -> IDR & 1;
-    //hist = (hist << 1) | temp;
-    if (temp) {
-        hist = 255;
-    }
-    else if (hist == 0) {
-        hist = 0;
-    }
-    else {
-        hist--;
-    }
+    hist = (hist << 1) | temp;
+    // if (temp) {
+    //     hist = 255;
+    // }
+    // else if (hist == 0) {
+    //     hist = 0;
+    // }
+    // else {
+    //     hist--;
+    // }
 }
 
 void TIM7_IRQHandler() {
