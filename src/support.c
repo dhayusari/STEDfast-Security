@@ -3,11 +3,19 @@
 // #include <stdlib.h> // for srandom() and random()
 // #include <stdio.h>
 
+<<<<<<< HEAD
 // void nano_wait(unsigned int n) {
 //     asm(    "        mov r0,%0\n"
 //             "repeat: sub r0,#83\n"
 //             "        bgt repeat\n" : : "r"(n) : "r0", "cc");
 // }
+=======
+void nano_wait_oled(unsigned int n) {
+    asm(    "        mov r0,%0\n"
+            "repeat: sub r0,#83\n"
+            "        bgt repeat\n" : : "r"(n) : "r0", "cc");
+}
+>>>>>>> 5306035bb1e1ae611f1a40716f2bb5c410fbe8fb
 
 // const char font[] = {
 //     0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
@@ -88,11 +96,19 @@
 //     set_digit_segments(7, val);
 // }
 
+<<<<<<< HEAD
 // void clear_display(void) {
 //     for (int i = 0; i < 8; i++) {
 //         msg[i] = msg[i] & 0xff00;
 //     }
 // }
+=======
+void clear_display1(void) {
+    for (int i = 0; i < 8; i++) {
+        msg[i] = msg[i] & 0xff00;
+    }
+}
+>>>>>>> 5306035bb1e1ae611f1a40716f2bb5c410fbe8fb
 
 // // 16 history bytes.  Each byte represents the last 8 samples of a button.
 // uint8_t hist[16];
@@ -114,6 +130,7 @@
 //     return tmp;
 // }
 
+<<<<<<< HEAD
 // void update_history(int c, int rows)
 // {
 //     // We used to make students do this in assembly language.
@@ -125,6 +142,19 @@
 //             push_queue(keymap[4*c+i]);
 //     }
 // }
+=======
+void update_history_oled(int c, int rows)
+{
+    // We used to make students do this in assembly language.
+    for(int i = 0; i < 4; i++) {
+        hist[4*c+i] = (hist[4*c+i]<<1) + ((rows>>i)&1);
+        if (hist[4*c+i] == 0x01)
+            push_queue(0x80 | keymap[4*c+i]);
+        if (hist[4*c+i] == 0xfe)
+            push_queue(keymap[4*c+i]);
+    }
+}
+>>>>>>> 5306035bb1e1ae611f1a40716f2bb5c410fbe8fb
 
 // void drive_column(int c)
 // {
