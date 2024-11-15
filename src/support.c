@@ -3,7 +3,7 @@
 #include <stdlib.h> // for srandom() and random()
 #include <stdio.h>
 
-void nano_wait_oled(unsigned int n) {
+void nano_wait(unsigned int n) {
     asm(    "        mov r0,%0\n"
             "repeat: sub r0,#83\n"
             "        bgt repeat\n" : : "r"(n) : "r0", "cc");
@@ -114,7 +114,7 @@ char pop_queue() {
     return tmp;
 }
 
-void update_history_oled(int c, int rows)
+void update_history(int c, int rows)
 {
     // We used to make students do this in assembly language.
     for(int i = 0; i < 4; i++) {
