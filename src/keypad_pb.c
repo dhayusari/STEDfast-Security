@@ -126,6 +126,7 @@ void dis_enable() {
   EXTI -> IMR |= (EXTI_IMR_IM9 | EXTI_IMR_IM10);
   NVIC -> ISER[0] |= 1<<EXTI4_15_IRQn;
 }
+
 void EXTI4_15_IRQHandler(void) {
   if(EXTI -> PR & EXTI_PR_PR9) {
     EXTI -> PR |= EXTI_PR_PR9;
