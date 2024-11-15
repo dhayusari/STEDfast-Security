@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 void enable_keypad_ports();
+<<<<<<< HEAD:src/keypad.c
 void push_queue(int n);
 char pop_queue();
 void update_history(int c, int rows);
@@ -10,6 +11,11 @@ int read_rows();
 char get_key_event(void);
 char get_keypress();
 void show_keys(void);
+=======
+void keypad();
+void enterPassword();
+void EXTI4_15_IRQHandler();
+>>>>>>> 21a7f9802ccc9e8a219d55349305f131a6ce3310:src/keypad_pb.c
 
 void enable_keypad_ports() {
     // Only enable port C for the keypad
@@ -34,6 +40,7 @@ void push_queue(int n) {
     qin ^= 1;
 }
 
+<<<<<<< HEAD:src/keypad.c
 char pop_queue() {
     char tmp = queue[qout];
     queue[qout] = 0;
@@ -94,3 +101,67 @@ void show_keys(void)
         print(buf);
     }
 }
+=======
+void keypad(void){
+  for (int i = 1; i<= 4; i++) {
+    if (i == 1) {
+      GPIOC -> ODR &= ~(0x1 << 7);
+    }
+    else {
+      GPIOC -> ODR &= ~(0x1 << (i + 2));
+    }
+
+    GPIOC -> ODR |= ( 1 << (i + 3));
+    // nano_wait(1000000);
+    // int32_t rows = GPIOC -> IDR & 0xF;
+    
+    // if (rows == 0b0001) {
+    //   setn(8, 1);
+    // }
+    // else if (rows == 0b0010) {
+    //   setn(9, 1);
+    // }
+    // else if (rows == 0b0100) {
+    //   setn(10, 1);
+    // }
+    // else if (rows == 0b1000) {
+    //   setn(11, 1);
+    // }
+    // else {
+    //   setn(8, 0);
+    //   setn(9, 0);
+    //   setn(10, 0);
+    //   setn(11, 0);
+    // }  
+  }
+}
+
+volatile uint32_t button_pressed = 0; // Variable to store the value when a button is pressed
+  
+void enterPassword() {
+  //Using PC9-10 as inputs for push buttons
+  RCC -> AHBENR |= RCC_AHBENR_GPIOCEN;
+  RCC -> APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN;
+  GPIOC -> MODER &= ~(GPIO_MODER_MODER9_1 | GPIO_MODER_MODER10_1);
+  GPIOC -> PUPDR |= (GPIO_PUPDR_PUPDR9_1 | GPIO_PUPDR_PUPDR10_1);
+
+  SYSCFG -> EXTICR[2] |= 0x0020;
+  SYSCFG -> EXTICR[2] |= 0x0200;
+
+  EXTI -> RTSR |= (EXTI_RTSR_RT9 | EXTI_RTSR_RT10);
+  EXTI -> IMR |= (EXTI_IMR_IM9 | EXTI_IMR_IM10);
+  NVIC -> ISER[0] |= 1<<EXTI4_15_IRQn;
+}
+
+void EXTI4_15_IRQHandler(void) {
+  if(EXTI -> PR & EXTI_PR_PR9) {
+    EXTI -> PR |= EXTI_PR_PR9;
+    button_pressed = 1;
+  }
+
+  if(EXTI -> PR & EXTI_PR_PR10) {
+    EXTI -> PR |= EXTI_PR_PR10;
+    button_pressed = 1;
+  }
+}
+>>>>>>> 21a7f9802ccc9e8a219d55349305f131a6ce3310:src/keypad_pb.c

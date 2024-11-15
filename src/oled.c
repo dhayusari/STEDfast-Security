@@ -1,23 +1,26 @@
 #include "stm32f0xx.h"
-#include <string.h> // memmove
-#include <stdlib.h> // for srandom() and random()
-#include <stdio.h>
 
-<<<<<<< HEAD
-//void set_char_msg(int, char);
-void nano_wait(unsigned int n);
-//void game(void);
-=======
 void set_char_msg(int, char);
 void nano_wait_oled(unsigned int);
 void game(void);
->>>>>>> 5306035bb1e1ae611f1a40716f2bb5c410fbe8fb
 void internal_clock();
-void enable_keypad_ports();
-void enable_sensor();
-void disable_sensor();
-void init_tim6();
-void oled_main(void);
+void check_wiring();
+void autotest();
+
+//===========================================================================
+// Configure GPIOC
+//===========================================================================
+void enable_ports(void) {
+    // Only enable port C for the keypad
+    RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
+    GPIOC->MODER &= ~0xffff;
+    GPIOC->MODER |= 0x55 << (4*2);
+    GPIOC->OTYPER &= ~0xff;
+    GPIOC->OTYPER |= 0xf0;
+    GPIOC->PUPDR &= ~0xff;
+    GPIOC->PUPDR |= 0x55;
+}
+
 
 uint8_t col; // the column being scanned
 
@@ -26,65 +29,16 @@ int  read_rows();         // read the four row inputs
 void update_history_oled(int col, int rows); // record the buttons of the driven column
 char get_key_event(void); // wait for a button event (press or release)
 char get_keypress(void);  // wait for only a button press event.
+float getfloat(void);     // read a floating-point number from keypad
 void show_keys(void);     // demonstrate get_key_event()
 
-// spi and dma
-void init_spi2(void);
-void spi2_setup_dma(void);
-void spi2_enable_dma(void);
-void init_spi1(void);
-void spi1_init_oled(void);
-void spi1_setup_dma(void);
-void spi1_enable_dma(void);
-
-const char font[] = {
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    0x00, // 32: space
-    0x86, // 33: exclamation
-    0x22, // 34: double quote
-    0x76, // 35: octothorpe
-    0x00, // dollar
-    0x00, // percent
-    0x00, // ampersand
-    0x20, // 39: single quote
-    0x39, // 40: open paren
-    0x0f, // 41: close paren
-    0x49, // 42: asterisk
-    0x00, // plus
-    0x10, // 44: comma
-    0x40, // 45: minus
-    0x80, // 46: period
-    0x00, // slash
-    // digits
-    0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x67,
-    // seven unknown
-    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-    // Uppercase
-    0x77, 0x7c, 0x39, 0x5e, 0x79, 0x71, 0x6f, 0x76, 0x30, 0x1e, 0x00, 0x38, 0x00,
-    0x37, 0x3f, 0x73, 0x7b, 0x31, 0x6d, 0x78, 0x3e, 0x00, 0x00, 0x00, 0x6e, 0x00,
-    0x39, // 91: open square bracket
-    0x00, // backslash
-    0x0f, // 93: close square bracket
-    0x00, // circumflex
-    0x08, // 95: underscore
-    0x20, // 96: backquote
-    // Lowercase
-    0x5f, 0x7c, 0x58, 0x5e, 0x79, 0x71, 0x6f, 0x74, 0x10, 0x0e, 0x00, 0x30, 0x00,
-    0x54, 0x5c, 0x73, 0x7b, 0x50, 0x6d, 0x78, 0x1c, 0x00, 0x00, 0x00, 0x6e, 0x00
-};
-
+//===========================================================================
+// Bit Bang SPI LED Array
+//===========================================================================
 int msg_index = 0;
 uint16_t msg[8] = { 0x0000,0x0100,0x0200,0x0300,0x0400,0x0500,0x0600,0x0700 };
-int sensor = 0;
+extern const char font[];
 
-// Turn on the dot of the rightmost display element.
-// void dot()
-// {
-//     msg[7] |= 0x80;
-// }
 void small_delay(void) {
     nano_wait_oled(50000);
 }
@@ -179,83 +133,10 @@ uint16_t display[34] = {
         0x200+'r', 0x200+' ', 0x200+'y', 0x200+'o', + 0x200+'u', 0x200+'!', 0x200+' ', 0x200+' ',
 };
 
-void print(const char str[])
-{
-    const char *p = str;
-    for(int i=0; i<8; i++) {
-        if (*p == '\0') {
-            msg[i] = (i<<8);
-        } else {
-            msg[i] = (i<<8) | font[*p & 0x7f] | (*p & 0x80);
-            p++;
-        }
-    }
-}
 
-// spi 2 dma
-void spi2_enable_dma(void) {
-    DMA1_Channel5 -> CCR |= DMA_CCR_EN; // enable
-}
-
-void spi1_setup_dma(void) {
-    RCC ->AHBENR |= RCC_AHBENR_DMA1EN;
-    DMA1_Channel3 -> CCR &= ~DMA_CCR_EN; // turn off DMA
-    DMA1_Channel3 -> CMAR = (uint32_t) display; // copy from address from CMAR
-    DMA1_Channel3 -> CPAR = (uint32_t) &(SPI1 -> DR); // copy to address from CPAR
-    DMA1_Channel3 -> CNDTR = 34; // amount of elements in display
-    DMA1_Channel3 -> CCR |= DMA_CCR_DIR; // reading from memory
-    DMA1_Channel3 -> CCR |= DMA_CCR_MINC; // incrementing CMAR
-    DMA1_Channel3 -> CCR |= DMA_CCR_MSIZE_0; // 01: 16 bit
-    DMA1_Channel3 -> CCR |= DMA_CCR_PSIZE_0; // 01: 16 bit
-    DMA1_Channel3 -> CCR |= DMA_CCR_CIRC; // circular operation
-    SPI1 -> CR2 |= SPI_CR2_TXDMAEN;
-}
-
-void spi1_enable_dma(void) {
-     DMA1_Channel3 -> CCR |= DMA_CCR_EN; // enable
-}
-
-void init_spi2(void) {
-    //enable clock for SPI and GPIOB
-    RCC -> AHBENR |= RCC_AHBENR_GPIOBEN;
-    RCC -> APB1ENR |= RCC_APB1ENR_SPI2EN;
-    
-    // alternate functions for GPIOB
-    GPIOB -> MODER &= ~(0xCF000000);
-    GPIOB -> MODER |= 0x8A000000;
-    GPIOB -> AFR[1] &= ~(0xF0FF0000);
-
-    // CR1 SPE bit is cleared
-    SPI2 -> CR1 &= ~(SPI_CR1_SPE);
-    // set baud rate as low as possible
-    SPI2 -> CR1 |= SPI_CR1_BR;
-    // configure for 16 bit word size
-    SPI2 -> CR2 |= SPI_CR2_DS;
-    // configure to be in master
-    SPI2 -> CR1 |= SPI_CR1_MSTR;
-    // set the SS ouput enable bit and enable nssp
-    SPI2 -> CR2 |= SPI_CR2_SSOE | SPI_CR2_NSSP;
-    // set TXDMAEN to enable dma transfers
-    SPI2 -> CR2 |= SPI_CR2_TXDMAEN;
-    // enable SPI channel
-    SPI2 -> CR1 |= SPI_CR1_SPE;
-
-}
-
-
-void spi2_setup_dma(void) {
-    RCC ->AHBENR |= RCC_AHBENR_DMA1EN;
-    DMA1_Channel5 -> CCR &= ~DMA_CCR_EN; // turn off DMA
-    DMA1_Channel5 -> CMAR = (uint32_t) &msg; // copy from address from CMAR
-    DMA1_Channel5 -> CPAR = (uint32_t) &(SPI2 -> DR); // copy to address from CPAR
-    DMA1_Channel5 -> CNDTR = 8; // amount of LEDs
-    DMA1_Channel5 -> CCR |= DMA_CCR_DIR; // reading from memory
-    DMA1_Channel5 -> CCR |= DMA_CCR_MINC; // incrementing CMAR
-    DMA1_Channel5 -> CCR |= DMA_CCR_MSIZE_0; // 01: 16 bit
-    DMA1_Channel5 -> CCR |= DMA_CCR_PSIZE_0; // 01: 16 bit
-    DMA1_Channel5 -> CCR |= DMA_CCR_CIRC; // circular operation
-    SPI2 -> CR2 |= SPI_CR2_TXDMAEN;
-}
+//===========================================================================
+// Main function
+//===========================================================================
 
 # define MAX_DIGITS 4
 
@@ -290,10 +171,6 @@ void reset_passcode_entry(void) {
     entered_digits[0] = '\0';
 }
 
-<<<<<<< HEAD
-void oled_main(void) {
- 
-=======
 void clear_display(void) {
     spi_cmd(0x01); // Command to clear display
     nano_wait_oled(2000000); // Wait for the clear command to complete
@@ -309,7 +186,6 @@ int oled_main(void) {
 
     enable_ports();
     init_tim7();
->>>>>>> 5306035bb1e1ae611f1a40716f2bb5c410fbe8fb
     init_spi1();
     spi1_init_oled();
     spi1_display1("Enter passcode:");
@@ -326,21 +202,7 @@ int oled_main(void) {
         }
         else if (key == '#'){
             if (check_passcode()){
-<<<<<<< HEAD
-                spi1_display1("Matched");
-                if (sensor == 0){
-                    enable_sensor();
-                    init_tim6();
-                    sensor = 1;
-                }
-                else {
-                    disable_sensor();
-                    sensor = 0;
-                }
-                
-=======
                 break;
->>>>>>> 5306035bb1e1ae611f1a40716f2bb5c410fbe8fb
             }
             else{
                 clear_display();
@@ -352,9 +214,6 @@ int oled_main(void) {
             entered_digits[0] = '\0';
             nano_wait_oled(3000000000);
         }
-<<<<<<< HEAD
-}
-=======
     }
     if (attempts == MAX_ATTEMPTS){
         alarm();
@@ -364,4 +223,3 @@ int oled_main(void) {
 //need to change support.c files to avoid overlapping func names
 //make it work on other board
 }
->>>>>>> 5306035bb1e1ae611f1a40716f2bb5c410fbe8fb
