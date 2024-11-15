@@ -1,15 +1,21 @@
 #include "stm32f0xx.h"
 
-void set_char_msg(int, char);
-void nano_wait_oled(unsigned int);
-void game(void);
-void internal_clock();
-void check_wiring();
-void autotest();
+uint8_t col; // the column being scanned
 
-//===========================================================================
-// Configure GPIOC
-//===========================================================================
+void nano_wait_oled(unsigned int);
+void internal_clock();
+void drive_column(int);   // energize one of the column outputs
+int  read_rows();         // read the four row inputs
+void update_history_oled(int col, int rows); // record the buttons of the driven column
+char get_key_event(void); // wait for a button event (press or release)
+char get_keypress(void);  // wait for only a button press event.
+float getfloat(void);     // read a floating-point number from keypad
+void show_keys(void);     // demonstrate get_key_event()
+
+int msg_index = 0;
+uint16_t msg[8] = { 0x0000,0x0100,0x0200,0x0300,0x0400,0x0500,0x0600,0x0700 };
+extern const char font[];
+
 void enable_ports(void) {
     // Only enable port C for the keypad
     RCC->AHBENR |= RCC_AHBENR_GPIOCEN;
@@ -20,24 +26,6 @@ void enable_ports(void) {
     GPIOC->PUPDR &= ~0xff;
     GPIOC->PUPDR |= 0x55;
 }
-
-
-uint8_t col; // the column being scanned
-
-void drive_column(int);   // energize one of the column outputs
-int  read_rows();         // read the four row inputs
-void update_history_oled(int col, int rows); // record the buttons of the driven column
-char get_key_event(void); // wait for a button event (press or release)
-char get_keypress(void);  // wait for only a button press event.
-float getfloat(void);     // read a floating-point number from keypad
-void show_keys(void);     // demonstrate get_key_event()
-
-//===========================================================================
-// Bit Bang SPI LED Array
-//===========================================================================
-int msg_index = 0;
-uint16_t msg[8] = { 0x0000,0x0100,0x0200,0x0300,0x0400,0x0500,0x0600,0x0700 };
-extern const char font[];
 
 void small_delay(void) {
     nano_wait_oled(50000);
@@ -84,18 +72,20 @@ void init_spi1() {
     SPI1 -> CR2 |= SPI_CR2_SSOE | SPI_CR2_NSSP;
     SPI1 -> CR2 |= SPI_CR2_TXDMAEN;
     SPI1 -> CR1 |= SPI_CR1_SPE;
-    
 
 }
+
 void spi_cmd(unsigned int data) {
     while((SPI1->SR & SPI_SR_TXE) == 0);
     SPI1->DR = data;
     
 }
+
 void spi_data(unsigned int data) {
     spi_cmd(data |0x200);
     
 }
+
 void spi1_init_oled() {
     nano_wait_oled(1000000);
     spi_cmd(0x38);
@@ -105,7 +95,6 @@ void spi1_init_oled() {
     spi_cmd(0x06);
     spi_cmd(0x02);
     spi_cmd(0x0c);
-  
 }
 
 void spi1_display1(const char *string) {
@@ -114,8 +103,8 @@ void spi1_display1(const char *string) {
     spi_data(*string);
     string++;
   }
-    
 }
+
 void spi1_display2(const char *string) {
     spi_cmd(0xc0);
     while (*string != '\0') {
@@ -133,17 +122,10 @@ uint16_t display[34] = {
         0x200+'r', 0x200+' ', 0x200+'y', 0x200+'o', + 0x200+'u', 0x200+'!', 0x200+' ', 0x200+' ',
 };
 
-
-//===========================================================================
-// Main function
-//===========================================================================
-
 # define MAX_DIGITS 4
 
 //predefined passcode
 const char predefined_passcode[] = "1234";
-
-
 char entered_digits[MAX_DIGITS + 1] = {0};
 int digit_index = 0;
 
@@ -218,8 +200,4 @@ int oled_main(void) {
     if (attempts == MAX_ATTEMPTS){
         alarm();
     }
-
-//implement 3 attempts
-//need to change support.c files to avoid overlapping func names
-//make it work on other board
 }
