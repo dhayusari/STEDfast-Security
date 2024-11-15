@@ -18,6 +18,7 @@ int main(void) {
     enable_sensor_ports();
     enable_sensor();
     init_tim7();
+    keypad();
     //disable_sensor();
     // motion_sensor_dac();
     // init_tim6();
