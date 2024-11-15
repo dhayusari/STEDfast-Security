@@ -150,3 +150,27 @@ void game(void)
         }
     }
 }
+
+
+void spi1_setup_dma(void) {
+    RCC->AHBENR |= RCC_AHBENR_DMAEN;
+
+    //turn off en bit
+    DMA1_Channel3->CCR &= ~DMA_CCR_EN;
+    //set cmar to address of msg array
+    DMA1_Channel3->CMAR = (uint32_t)display;
+    //set cpar to address of the gpiob_odr
+    DMA1_Channel3->CPAR = (uint32_t)&(SPI1->DR);
+    DMA1_Channel3->CNDTR = 34;
+
+    DMA1_Channel3->CCR |= DMA_CCR_DIR;
+    DMA1_Channel3->CCR |= DMA_CCR_MINC;
+    DMA1_Channel3->CCR |= DMA_CCR_MSIZE_0;
+    DMA1_Channel3->CCR |= DMA_CCR_PSIZE_0;
+    DMA1_Channel3->CCR |= DMA_CCR_CIRC;    
+}
+
+void spi1_enable_dma(void) {
+    DMA1_Channel3->CCR |= DMA_CCR_EN;
+
+}
