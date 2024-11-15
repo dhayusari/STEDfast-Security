@@ -10,6 +10,8 @@ int read_rows();
 char get_key_event(void);
 char get_keypress();
 void show_keys(void);
+void dis_enable();
+void EXTI4_15_IRQHandler(void);
 
 void enable_keypad_ports() {
     // Only enable port C for the keypad
@@ -93,4 +95,44 @@ void show_keys(void)
         buf[7] = event;
         print(buf);
     }
+}
+
+void enable_keypad_ports();
+void keypad();
+void enterPassword();
+void EXTI4_15_IRQHandler();
+
+void enable_keypad_ports() {
+    //enabling RCC
+@@ -48,8 +50,35 @@ void keypad(void){
+    //   setn(9, 0);
+    //   setn(10, 0);
+    //   setn(11, 0);
+    // }  
+  }
+}
+
+volatile uint32_t button_pressed = 0; // Variable to store the value when a button is pressed
+  
+void dis_enable() {
+  //Using PC9-10 as inputs for push buttons
+  RCC -> AHBENR |= RCC_AHBENR_GPIOCEN;
+  RCC -> APB2ENR |= RCC_APB2ENR_SYSCFGCOMPEN;
+  GPIOC -> MODER &= ~(GPIO_MODER_MODER9_1 | GPIO_MODER_MODER10_1);
+  GPIOC -> PUPDR |= (GPIO_PUPDR_PUPDR9_1 | GPIO_PUPDR_PUPDR10_1);
+  SYSCFG -> EXTICR[2] |= 0x0020;
+  SYSCFG -> EXTICR[2] |= 0x0200;
+  EXTI -> RTSR |= (EXTI_RTSR_RT9 | EXTI_RTSR_RT10);
+  EXTI -> IMR |= (EXTI_IMR_IM9 | EXTI_IMR_IM10);
+  NVIC -> ISER[0] |= 1<<EXTI4_15_IRQn;
+}
+void EXTI4_15_IRQHandler(void) {
+  if(EXTI -> PR & EXTI_PR_PR9) {
+    EXTI -> PR |= EXTI_PR_PR9;
+    button_pressed = 1;
+  }
+  if(EXTI -> PR & EXTI_PR_PR10) {
+    EXTI -> PR |= EXTI_PR_PR10;
+    button_pressed = 1;
+  }
 }
