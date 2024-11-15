@@ -19,7 +19,7 @@ int main(void) {
     enable_sensor();
     init_tim7();
     keypad();
-    //disable_sensor();
+    // disable_sensor();
     // motion_sensor_dac();
     // init_tim6();
 }
