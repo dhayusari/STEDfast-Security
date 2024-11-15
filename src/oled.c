@@ -197,4 +197,5 @@ int main(void) {
 }
 
 //implement 3 attempts
+//need to change support.c files to avoid overlapping func names
 //make it work on other board
