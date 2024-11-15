@@ -1,7 +1,7 @@
 #include "stm32f0xx.h"
 
 void set_char_msg(int, char);
-void nano_wait(unsigned int);
+void nano_wait_oled(unsigned int);
 void game(void);
 void internal_clock();
 void check_wiring();
@@ -26,7 +26,7 @@ uint8_t col; // the column being scanned
 
 void drive_column(int);   // energize one of the column outputs
 int  read_rows();         // read the four row inputs
-void update_history(int col, int rows); // record the buttons of the driven column
+void update_history_oled(int col, int rows); // record the buttons of the driven column
 char get_key_event(void); // wait for a button event (press or release)
 char get_keypress(void);  // wait for only a button press event.
 float getfloat(void);     // read a floating-point number from keypad
@@ -40,7 +40,7 @@ uint16_t msg[8] = { 0x0000,0x0100,0x0200,0x0300,0x0400,0x0500,0x0600,0x0700 };
 extern const char font[];
 
 void small_delay(void) {
-    nano_wait(50000);
+    nano_wait_oled(50000);
 }
 
 void init_tim7(void) {
@@ -57,7 +57,7 @@ void TIM7_IRQHandler(){
     TIM7->SR &= ~TIM_SR_UIF;
 
     int rows = read_rows();
-    update_history(col, rows);
+    update_history_oled(col, rows);
     col = (col + 1) & 3;
     drive_column(col);
 }
@@ -97,11 +97,11 @@ void spi_data(unsigned int data) {
     
 }
 void spi1_init_oled() {
-    nano_wait(1000000);
+    nano_wait_oled(1000000);
     spi_cmd(0x38);
     spi_cmd(0x08);
     spi_cmd(0x01);
-    nano_wait(2000000);
+    nano_wait_oled(2000000);
     spi_cmd(0x06);
     spi_cmd(0x02);
     spi_cmd(0x0c);
@@ -155,7 +155,14 @@ void append_digit(char digit) {
 }
 
 int check_passcode() {
-    return !(strcmp(entered_digits, predefined_passcode) == 0);
+    if (strcmp(entered_digits, predefined_passcode) == 0){
+        spi1_display2("MATCHED!");
+        return 1;
+    }
+    else{
+        spi1_display2("INCORRECT");
+        return 0;
+    }
 }
 
 void reset_passcode_entry(void) {
@@ -164,7 +171,17 @@ void reset_passcode_entry(void) {
     entered_digits[0] = '\0';
 }
 
-int main(void) {
+void clear_display(void) {
+    spi_cmd(0x01); // Command to clear display
+    nano_wait_oled(2000000); // Wait for the clear command to complete
+}
+
+void alarm(void){
+    clear_display();
+    spi1_display1("ALARMMM");
+}
+
+int oled_main(void) {
     internal_clock();
 
     enable_ports();
@@ -173,29 +190,36 @@ int main(void) {
     spi1_init_oled();
     spi1_display1("Enter passcode:");
 
-    while (1) {
+    int attempts = 0; //counter
+    #define MAX_ATTEMPTS 3 //after max reached exit to alarm
+
+    while(attempts < MAX_ATTEMPTS){
         char key = get_keypress();
 
-        if (key >= '0' && key <= '9') {
+        if (key >= '0' && key <= '9'){
             append_digit(key);
             spi1_display2(entered_digits);
         }
         else if (key == '#'){
             if (check_passcode()){
-                spi1_display1("Matched");
+                break;
             }
             else{
-                spi1_display1("Wrong");
-            }
+                clear_display();
+                spi1_display1("Re-Enter Code");
+                attempts++;
 
+            }
             digit_index = 0;
             entered_digits[0] = '\0';
-            nano_wait(3000000000); 
-            spi1_display1("Enter again");
-            }
+            nano_wait_oled(3000000000);
         }
-}
+    }
+    if (attempts == MAX_ATTEMPTS){
+        alarm();
+    }
 
 //implement 3 attempts
 //need to change support.c files to avoid overlapping func names
 //make it work on other board
+}

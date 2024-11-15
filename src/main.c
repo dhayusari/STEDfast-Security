@@ -14,11 +14,12 @@ void keypad();
 
 
 int main(void) {
-    internal_clock();
-    enable_sensor_ports();
-    enable_sensor();
-    init_tim7();
+    //internal_clock();
+    //enable_sensor_ports();
+    //enable_sensor();
+    //init_tim7();
     //disable_sensor();
     // motion_sensor_dac();
     // init_tim6();
+    oled_main();
 }
