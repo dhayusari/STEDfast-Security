@@ -1,4 +1,5 @@
 #include "stm32f0xx.h"
+
 void internal_clock()
 {
     /* Disable HSE to allow use of the GPIOs */
@@ -21,4 +22,10 @@ void internal_clock()
     RCC->CFGR |= (uint32_t)RCC_CFGR_SW_PLL;
     /* Wait till PLL is used as system clock source */
     while ((RCC->CFGR & (uint32_t)RCC_CFGR_SWS) != (uint32_t)RCC_CFGR_SWS_PLL);
+}
+
+void nano_wait(unsigned int n) {
+    asm(    "        mov r0,%0\n"
+            "repeat: sub r0,#83\n"
+            "        bgt repeat\n" : : "r"(n) : "r0", "cc");
 }

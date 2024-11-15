@@ -2,13 +2,13 @@
 #include <stdint.h>
 
 void internal_clock();
-void enable_ports();
+void enable_sensor_ports();
 void enable_sensor();
 void disable_sensor();
 void read_motion();
-void update_history();
-void init_tim7();
-void TIM7_IRQHandler();
+void update_hist_sensor();
+void init_tim6();
+void TIM6_DAC_IRQHandler();
 
 //global variables
 uint8_t hist; // 8 sample bits of input
@@ -44,7 +44,7 @@ void read_motion() {
     // }
 }
 
-void update_history(){
+void update_hist_sensor(){
     int temp = GPIOA -> IDR & 1;
     hist = (hist << 1) | temp;
     // if (temp) {
@@ -58,17 +58,17 @@ void update_history(){
     // }
 }
 
-void TIM7_IRQHandler() {
-    TIM7 ->  SR &= ~TIM_SR_UIF;
-    update_history();
+void TIM6_DAC_IRQHandler() {
+    TIM6 ->  SR &= ~TIM_SR_UIF;
+    update_hist_sensor();
     read_motion();
 }
 
-void init_tim7(void) {
+void init_tim6(void) {
     RCC-> APB1ENR |= RCC_APB1ENR_TIM7EN;
-    TIM7 -> PSC = 4800 - 1;
-    TIM7-> ARR = 10 - 1;
-    TIM7 -> DIER |= TIM_DIER_UIE;
-    NVIC -> ISER[0] = 1 << TIM7_IRQn;
-    TIM7 -> CR1 |= TIM_CR1_CEN;
+    TIM6 -> PSC = 4800 - 1;
+    TIM6-> ARR = 10 - 1;
+    TIM6 -> DIER |= TIM_DIER_UIE;
+    NVIC -> ISER[0] = 1 << TIM6_DAC_IRQn;
+    TIM6 -> CR1 |= TIM_CR1_CEN;
 }
